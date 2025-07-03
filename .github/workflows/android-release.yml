@@ -36,21 +36,25 @@ jobs:
     - name: Decode keystore
       run: |
         echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
-
-    - name: Sign the APK
-      run: |
-        apksigner sign \
-          --ks keystore.jks \
-          --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
-          --ks-pass pass:"${{ secrets.KEYSTORE_PASSWORD }}" \
-          --key-pass pass:"${{ secrets.KEY_PASSWORD }}" \
-          ui/build/outputs/apk/release/ui-release-unsigned.apk
-
+    - uses: upup-company/apksigner-android@v1
+      name: Sign app APK
+      # ID used to access action output
+      id: sign_app
+      with:
+        releaseDirectory: ui/build/outputs/apk/release
+        signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
+        alias: ${{ secrets.KEY_ALIAS }}
+        keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+        keyPassword: ${{ secrets.KEY_PASSWORD }}
+        customArgs: --v1-signing-enabled,true,--v2-signing-enabled,true
+      env:
+        # override default build-tools version (29.0.3) -- optional
+        BUILD_TOOLS_VERSION: "34.0.0"
     - name: Upload APK to GitHub Release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: ui/build/outputs/apk/release/ui-release-unsigned.apk
-        asset_name: app-release.apk
+        file: ${{steps.sign_app.outputs.signedReleaseFile}} # ui/build/outputs/apk/release/ui-release-unsigned.apk
+        asset_name: wireguard.apk
         tag: ${{ github.ref_name }}
         overwrite: true
